@@ -1,0 +1,16 @@
+Code to generate results of paper:
+
+Deglaciation-enhanced mantle CO2 fluxes at Yellowstone imply positive climate feedback
+by Fiona Clerc, Mark D. Behn, Brent M. Minchew
+
+--------------------------------------------------------------------------------------
+
+The parameter files yellowstone*prm generate the main model for Yellowstone (e.g. Figure 4).
+The parameter files iceland*prm generate the main model for Iceland (e.g. Figure 2).
+The parameter files JM96*prm generate the Jull and McKenzie (1996) benchmark model (e.g. Figure S1).
+
+Instructions
+1. Compile melt_viscoelastic.* as plugin to ASPECT installation (v 2.2.0)
+2. Run model to steady state using *SS.prm files
+3. Convert output to ascii files using "run_write_pvpython.sh"
+4. Run unloading model using *unload.prm files
