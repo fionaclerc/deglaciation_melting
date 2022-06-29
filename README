@@ -18,7 +18,7 @@ Instructions
 Sensitivity analyses presented in the supplement may be replicated by modifying parameters in the parameter files.
 
 The function JM_analytical.m outputs the rate of change in pressure in a viscoelastic half-space, under a deglaciating parabolic load, following the semi-analytical solution of Jull and McKenzie (1996).
-It can replicate Figure 5 of this study.
+Integrated through time, it can replicate Figure 5 of this study.
 
 The function calc_TE_CO2_streamline.m calculates trace elements and CO2 concentrations along a streamline, assuming retained batch melting. It can be used to replicate CO2 fluxes (e.g. Figure 3), when integrated over an entire model domain.
 
