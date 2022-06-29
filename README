@@ -5,13 +5,24 @@ by Fiona Clerc, Mark D. Behn, Brent M. Minchew
 
 --------------------------------------------------------------------------------------
 
-The parameter files yellowstone*prm generate the main model for Yellowstone (e.g. Figure 4).
+The parameter files yellowstone*prm generate the main model for Yellowstone (e.g. Figure 4), in 2-D and 3-D.
 The parameter files iceland*prm generate the main model for Iceland (e.g. Figure 2).
 The parameter files JM96*prm generate the Jull and McKenzie (1996) benchmark model (e.g. Figure S1).
 
 Instructions
-1. Compile melt_viscoelastic.* as plugin to ASPECT installation (v 2.2.0)
+1. Compile melt_simpler_viscoelastic.* as plugin to ASPECT installation (v 2.2.0)
 2. Run model to steady state using *SS.prm files
 3. Convert output to ascii files using "run_write_pvpython.sh"
 4. Run unloading model using *unload.prm files
 
+Sensitivity analyses presented in the supplement may be replicated by modifying parameters in the parameter files.
+
+The function JM_analytical.m outputs the rate of change in pressure in a viscoelastic half-space,
+under a deglaciating parabolic load, following the semi-analytical solution of Jull and McKenzie (1996).
+It can replicate Figure 5 of this study.
+
+The function calc_TE_CO2_streamline.m calculates trace elements and CO2 concentrations along a streamline,
+assuming retained batch melting. It can be used to replicate CO2 fluxes (e.g. Figure 3), when integrated over
+an entire model domain.
+
+Please contact me with any questions: fclerc@mit.edu
