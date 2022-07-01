@@ -1,0 +1,315 @@
+# Primary model for Yellowstone, during unloading, 3-D
+
+set Dimension                              = 3
+set Adiabatic surface temperature          = 1593
+
+set Nonlinear solver scheme                = single Advection, single Stokes
+set Output directory                       = yellowstone_3D_unload
+
+set Start time                             = 0
+set End time                               = 28.e3
+set Maximum time step                     = 200
+set Use years in output instead of seconds = true
+set Timing output frequency                = 1
+set Pressure normalization                 = no
+#set Resume computation                     = true
+
+subsection Solver parameters
+  subsection Stokes solver parameters
+    set Maximum number of expensive Stokes solver steps = 5000
+    set GMRES solver restart length = 50 # instead of 50
+  end
+end
+
+# Element types
+subsection Discretization
+  set Composition polynomial degree     = 2
+  set Stokes velocity polynomial degree = 2
+  set Temperature polynomial degree     = 2
+end
+
+# Formulation classification
+subsection Formulation
+  set Enable elasticity = true
+  set Enable additional Stokes RHS = true
+end
+
+##################### Melting and freezing ########################
+
+set Use operator splitting                     = false
+
+subsection Solver parameters
+  subsection Stokes solver parameters
+    set GMRES solver restart length = 200
+  end
+end
+
+
+subsection Material model
+  set Model name = melt simpler viscoelastic
+
+  subsection Melt simpler viscoelastic
+    set Use fixed elastic time step = false
+    set Use stress averaging = false
+    set Fixed elastic time step = 5000
+    set Reference permeability            = 1e-7
+    set Elastic shear moduli        = 1.e10
+    set Reference shear modulus =1.e10
+    set Thermal conductivity              = 4.7
+    set Reference solid density           = 3300
+    set Thermal expansion coefficient     = 2.5e-5
+    set Thermal expansivities               = 2.5e-5
+    set Reference shear viscosity         = 1.e20
+    set Thermal viscosity exponent        = 40.0
+    set Reference bulk viscosity           = 2.e20
+    set Thermal bulk viscosity exponent   = 0
+    set Depletion density change          = 0.0
+    set Depletion solidus change          = 0
+    set Use fractional melting = true
+    set Maximum viscosity scaling = 1.e3
+    set Minimum viscosity scaling = 1.e-6
+    set Exponential melt weakening factor = 0
+    set Reference tensile strength = 5.e60
+    set Maximum tensile strength scaling = 1.e7
+    set Minimum tensile strength scaling = 1.e-2
+    set Thermal tensile strength exponent = 400
+    set Weaken ridge =false
+    set Weaken length = 50.e3
+    set Weaken gradient = 50.e3
+    set Cohesion = 2.e70
+    set Angle of internal friction = 30.0
+    #set Limit porosities = false
+    set Activation volume = 20.e-6
+    set Viscosity scale   = 1.e-10
+    set Activation energy = 500.e3
+    set Reference strain rate = 2e-15
+    set Distance melting suppressed = 300.e3
+  end
+end
+
+##################### Model geometry ########################
+
+subsection Geometry model
+  set Model name = box
+
+  subsection Box
+    set X extent      = 2700.e3
+    set Y extent      = 900.e3
+    set Z extent      = 600.e3
+    # To keep the aspect ratio of our elements close to one, we chose the 
+    # coarse mesh is such a way that it has more elements in X than in Y
+    # direction, in the same ratio as the aspect ratio of the model. 
+    set X repetitions = 15
+    set Y repetitions = 5
+    set Z repetitions = 4
+  end
+end
+
+# The gravity is constant and points downward. 
+subsection Gravity model
+  set Model name = vertical
+  subsection Vertical
+    set Magnitude = 9.8
+  end
+end
+
+##################### Velocity ########################
+
+subsection Mesh deformation
+  set Additional tangential mesh velocity boundary indicators = left,right, front, back
+  set Mesh deformation boundary indicators = top: free surface
+  subsection Free surface
+    set Surface velocity projection      = normal
+  end
+end
+
+
+subsection Boundary velocity model
+  set Prescribed velocity boundary indicators = top xy:function, right:ascii data, bottom:ascii data, left:ascii data, back:ascii data
+  set Tangential velocity boundary indicators = front
+
+  subsection Function
+    set Function constants  = u0=0.02, vel_gradient = 30.e3, Lz = 600e3, x0 =100.e3, xc = 300e3, Lx = 1200e3,qplume = .1,xplume = 300.e3,xwidth=50.e3
+    set Variable names      = x,y,z,t
+    set Function expression = u0 * z/Lz;0; 0
+
+  end
+
+  subsection Ascii data model
+    set Data directory = /vortexfs1/scratch/fclerc/aspect/MOR/IL_v_YS_SS/yellowstone_3D_SS/out_files/
+    set Data file name = out_%s.%d.txt 
+    set Data file time step = 0  
+  end
+end
+
+# We prescribe the loading function as a vertical traction on the top boundary,
+# read in from ascii files.
+
+subsection Boundary traction model
+  
+  set Prescribed traction boundary indicators = top z: ascii data
+   
+  subsection Ascii data model
+    set Data directory = /vortexfs1/scratch/fclerc/aspect/MOR/IL_v_YS_SS/YS_v84_alt_top/
+    set Data file name = BC_alt_%s_%d.txt
+    set Data file time step = 100.
+    set First data file number = 0
+    set First data file model time = 19.e3
+    set Scale factor = -1.
+  end
+end
+
+
+##################### Temperature ########################
+# As initial temperature, we load in temperatures from the spin-up model.
+
+subsection Initial temperature model
+  set Model name = ascii data
+  subsection Ascii data model
+    set Data directory = /vortexfs1/scratch/fclerc/aspect/MOR/IL_v_YS_SS/yellowstone_3D_SS/out_files/
+    set Data file name = out_temp_20.txt 
+  end
+
+
+end
+
+# We choose a constant temperature at all sides but the front, which
+# has zero heat flux condition.
+subsection Boundary temperature model
+  set Fixed temperature boundary indicators = top, bottom, left, right, back
+  set List of model names = initial temperature
+  subsection Initial temperature
+    set Minimal temperature = 273
+    set Maximal temperature = 1593
+  end
+  subsection Box
+    set Top temperature = 273
+    set Bottom temperature = 1593
+  end
+end
+
+
+
+subsection Heating model
+  set List of model names = adiabatic heating,  radioactive decay, latent heat melt
+  subsection Radioactive decay
+    set Number of elements            = 1
+    set Heating rates                 = 1.2e-9
+    set Half decay times              = 1.e20
+    set Initial concentrations mantle = 0.0
+    set Initial concentrations crust  = 1.0
+    set Crust defined by composition  = false
+    set Exponential depth decay       = true
+    set Crust depth                   = 30.e3
+  end
+end
+
+##################### Composition ########################
+
+subsection Compositional fields
+  set Number of fields = 7
+  set Names of fields = stress_xx,stress_yy,stress_zz, stress_xy,stress_xz,stress_yz,porosity #, peridotite, p_c_field
+end
+
+subsection Initial composition model
+
+  set List of model names = ascii data
+  subsection Ascii data model 
+    set Data directory = /vortexfs1/scratch/fclerc/aspect/MOR/IL_v_YS_SS/yellowstone_3D_SS/out_files/
+    set Data file name = out_comp_20.txt  
+  end
+ 
+end
+
+# The boundary conditions (which are relevant for material inflowing at the 
+# bottom boundary of the model) are the same as the initial conditions.
+subsection Boundary composition model
+  set Fixed composition boundary indicators   = bottom, right, left, back
+  set List of model names = initial composition
+  
+end
+
+##################### Mesh refinement #########################
+
+# We use a grid wih greater resolution in the zone of melting.
+
+subsection Mesh refinement
+  set Coarsening fraction                      = 0.001
+  set Refinement fraction                      = 0.2
+
+  # A refinement level of 5 (4 global + 1 adaptive refinements) corresponds to 
+  # a cell size of approximately 1 km. 
+  set Initial adaptive refinement              = 1 
+  set Initial global refinement                = 3
+  set Strategy                                 = minimum refinement function, maximum refinement function
+  set Time steps between mesh refinement       = 0
+  
+  subsection Minimum refinement function
+    set Coordinate system   = cartesian
+    set Function expression = 4
+    set Variable names      = x,y,z
+    set Function constants  = plume_loc=1350.e3, z0=400.e3, zf=600.e3, r0=300.e3, rf=4, rc=3
+    set Function expression = if((z>=z0 & z<=zf & x<=(plume_loc+r0) & x>=(plume_loc-r0) & y<=r0), rf, rc)
+  end
+  subsection Maximum refinement function
+    set Coordinate system   = cartesian
+    set Function expression = 4
+    set Variable names      = x,y,z
+    set Function constants  = plume_loc=1350.e3, z0=400.e3, zf=600.e3, r0=300.e3, rf=4, rc=3
+    set Function expression = if((z>=z0 & z<=zf & x<=(plume_loc+r0) & x>=(plume_loc-r0) & y<=r0), rf, rc)
+  end
+
+
+end
+
+##################### Postprocessing ########################
+
+subsection Postprocess
+
+  set List of postprocessors = visualization, basic statistics, temperature statistics, topography, composition statistics, velocity statistics, heat flux statistics, melt statistics, depth average
+
+  subsection Visualization
+      set List of output variables      = heating, material properties, melt material properties, melt fraction, strain rate, nonadiabatic pressure, vertical heat flux, volumetric strain rate #, maximum horizontal compressive stress
+
+    subsection Material properties
+      set List of material properties = density, viscosity
+    end
+
+
+   
+    subsection Melt material properties
+      set List of properties = melt production rate, dFdP, dFdT, DPDt, DTDt
+    end
+
+    set Time between graphical output = 1.
+    set Interpolate output = false
+  end
+
+  subsection Topography
+    set Output to file = true
+    set Time between text output = 1.
+  end
+
+  subsection Depth average
+    set List of output variables = composition, velocity magnitude, net melt production rate, positive melt production rate #, vertical heat flux, vertical mass flux, melt fraction #, melt production rate
+    set Time between graphical output = 1.
+    set Input dimension = 2 
+    set Output format = txt
+    set Get average = false
+    set Number of zones = 80 # repetitions * 2^(refinement), in y
+  end
+end
+
+
+# Termination criteria
+subsection Termination criteria
+ set Termination criteria = end time
+end
+
+# We write a checkpoint every 100 time steps, so that we are able to restart 
+# the computation from that point.
+subsection Checkpointing
+  set Steps between checkpoint = 20
+end
+
+

@@ -1,0 +1,297 @@
+# Primary model for Yelloowstone, during unloading, 2-D.
+
+set Dimension                              = 2
+set Adiabatic surface temperature          = 1593
+
+set Nonlinear solver scheme                = single Advection, single Stokes
+set Output directory                       = yellowstone_2D_unload
+
+set Start time                             = 0
+set End time                               = 32.e3
+set Maximum time step                      = 100
+set Use years in output instead of seconds = true
+set Timing output frequency                = 1
+set Pressure normalization                 = no
+
+subsection Solver parameters
+  subsection Stokes solver parameters
+    set Maximum number of expensive Stokes solver steps = 5000
+    set GMRES solver restart length = 50 # instead of 50
+  end
+end
+
+# Element types
+subsection Discretization
+  set Composition polynomial degree     = 2
+  set Stokes velocity polynomial degree = 2
+  set Temperature polynomial degree     = 2
+end
+
+# Formulation classification
+subsection Formulation
+  set Enable elasticity = true
+  set Enable additional Stokes RHS = true
+end
+
+subsection Solver parameters
+
+  subsection Stokes solver parameters
+    set GMRES solver restart length = 200
+  end
+end
+
+subsection Material model
+   set Model name = melt simpler viscoelastic
+
+  subsection Melt simpler viscoelastic
+    set Use fixed elastic time step = false
+    set Use stress averaging = false
+    set Fixed elastic time step = 5000
+    set Elastic shear moduli        = 1.e10
+    set Reference shear modulus =1.e10
+    set Thermal conductivity              = 4.7
+    set Reference solid density           = 3300
+    set Thermal expansion coefficient     = 2.5e-5
+    set Thermal expansivities               = 2.5e-5
+    set Reference shear viscosity         = 1.e20
+    set Thermal viscosity exponent        = 40.0
+    set Reference bulk viscosity           = 2.e20
+    set Thermal bulk viscosity exponent   = 0
+    set Depletion density change          = 0.0
+    set Depletion solidus change          = 0
+    set Use fractional melting = true
+    set Maximum viscosity scaling = 1.e3
+    set Minimum viscosity scaling = 1.e-6
+    set Reference tensile strength = 5.e60
+    set Maximum tensile strength scaling = 1.e7
+    set Minimum tensile strength scaling = 1.e-2
+    set Thermal tensile strength exponent = 400
+    set Weaken ridge =false
+    set Weaken length = 50.e3
+    set Weaken gradient = 50.e3
+    set Cohesion = 2.e70
+    set Angle of internal friction = 30.0
+    set Activation volume = 20.e-6
+    set Viscosity scale   = 1.e-10
+    set Activation energy = 500.e3
+    set Reference strain rate = 2.e-15
+    set Distance melting suppressed = 700.e3
+  end
+end
+
+##################### Model geometry ########################
+
+subsection Geometry model
+  set Model name = box
+
+  subsection Box
+    set X extent      = 2700.e3
+    set Y extent      = 600.e3
+    # To keep the aspect ratio of our elements close to one, we chose the 
+    # coarse mesh is such a way that it has more elements in X than in Y
+    # direction, in the same ratio as the aspect ratio of the model. 
+    set X repetitions = 18
+    set Y repetitions = 4
+  end
+end
+
+# The gravity is constant and points downward. 
+subsection Gravity model
+  set Model name = vertical
+  subsection Vertical
+    set Magnitude = 9.8
+  end
+end
+
+##################### Velocity ########################
+
+# Top boundary is now a free surface, and deforms according to prescribed load.
+subsection Mesh deformation
+  set Additional tangential mesh velocity boundary indicators = left,right
+  set Mesh deformation boundary indicators = top: free surface
+  subsection Free surface
+    set Surface velocity projection      = normal
+  end
+end
+
+# We read in velocity profiles from spin-up phase.
+subsection Boundary velocity model
+  set Prescribed velocity boundary indicators = top x:function, right:ascii data, bottom:ascii data, left:ascii data
+
+  subsection Function
+    set Function constants  = u0=0.02, vel_gradient = 30.e3, Lz = 600e3, x0 =100.e3, xc = 300e3, Lx = 1200e3,qplume = .1,xplume = 300.e3,xwidth=50.e3
+    set Variable names      = x,y,t
+    set Function expression = u0 ; 0
+
+  end
+  
+  subsection Ascii data model
+  # Here you would need to modify path...
+    set Data directory = /vortexfs1/scratch/fclerc/aspect/MOR/IL_v_YS_SS/yellowstone_2D_SS/out_files/
+    set Data file name = out_%s.%d.txt
+    set Data file time step = 0
+  end
+end
+
+# Prescribe loading as a vertical stress function.
+subsection Boundary traction model
+  
+  set Prescribed traction boundary indicators = top y: function
+  subsection Function
+    set Variable names = x,y,t
+    set Function constants  = r0=50.e3, H0=-1.25e3, t1=29.e3, rhoi=900,u0 = 0,xc = 1375.e3, x0 = 10.e3, g=9.8, t0=27.e3, dAdt=-25, tpre0=20.e3, tpre1 = 22.e3, dAdtpre = 25
+        # r0 is load radius, H0 is load height, t1 is time load is fully removed,
+        # rhoi is density of ice/load
+        # option to linearly thin load beginning at time t0.
+    set Function expression = 0; if (t > tpre0, if (t<tpre1,  if(abs(x-xc)<dAdtpre*(t-tpre0),  g*H0*rhoi*(1 - (abs(x-xc)/(dAdtpre*(t-tpre0)))^2) , 0)    ,  if(t<t0, if(abs(x-xc)<r0, g*H0*rhoi*(1-(abs(x-xc)/r0)^2), 0), if(t<t1, if(abs(x-xc)<(r0+dAdt*(t-t0)),g*H0*rhoi*(1-(abs(x-xc)/(r0+dAdt*(t-t0)))^2) ,0),0 ) )), 0)
+
+  end
+end
+
+
+##################### Temperature ########################
+# Prescribe temperature from spin-up model.
+subsection Initial temperature model
+  set Model name = ascii data
+  subsection Ascii data model
+    set Data directory = /vortexfs1/scratch/fclerc/aspect/MOR/IL_v_YS_SS/yellowstone_2D_SS/out_files/
+    set Data file name = out20.txt
+
+  end
+
+end
+
+subsection Boundary temperature model
+  set Fixed temperature boundary indicators = top, bottom, left, right
+  set List of model names = initial temperature
+  subsection Initial temperature
+    set Minimal temperature = 273
+    set Maximal temperature = 1593
+  end
+end
+
+
+
+subsection Heating model
+  set List of model names = adiabatic heating,  radioactive decay, latent heat melt
+  subsection Radioactive decay
+    set Number of elements            = 1
+    set Heating rates                 = 1.2e-9
+    set Half decay times              = 1.e20
+    set Initial concentrations mantle = 0.0
+    set Initial concentrations crust  = 1.0
+    set Crust defined by composition  = false
+    set Exponential depth decay       = true
+    set Crust depth                   = 30.e3
+  end
+end
+
+##################### Composition ########################
+
+subsection Compositional fields
+  set Number of fields = 6
+  set Names of fields = stress_xx,stress_yy,stress_xy,porosity, peridotite, p_c_field
+end
+
+subsection Initial composition model
+  set List of model names = ascii data
+  subsection Ascii data model
+    set Data directory = /vortexfs1/scratch/fclerc/aspect/MOR/IL_v_YS_SS/yellowstone_2D_SS/out_files/
+    set Data file name = out_comp_20.txt
+
+  end
+end
+
+# The boundary conditions (which are relevant for material inflowing at the 
+# bottom boundary of the model) are the same as the initial conditions.
+subsection Boundary composition model
+  set Fixed composition boundary indicators   = bottom, right, left
+  set List of model names = initial composition
+  
+end
+
+##################### Mesh refinement #########################
+
+# We use a grid wih greater resolution than in spin-up model, in the zone of melting.
+subsection Mesh refinement
+  set Coarsening fraction                      = 0.001
+  set Refinement fraction                      = 0.2
+
+  set Initial adaptive refinement              = 0 
+  set Initial global refinement                = 5
+  set Strategy                                 = minimum refinement function, maximum refinement function
+  set Time steps between mesh refinement       = 0
+  set Additional refinement times = 100
+
+  subsection Minimum refinement function
+    set Coordinate system   = cartesian
+    set Variable names      = x,y
+    set Function constants  = x0=1000.e3, xf=1900.e3, y0=300.e3, rf=5, rc=4
+    set Function expression =  if((y>=300.e3) & (x>=x0) & (x<=xf),rf,rc )
+  end
+
+
+  subsection Maximum refinement function
+    set Coordinate system   = cartesian
+    set Variable names      = x,y
+    set Function constants  = x0=1000.e3, xf=1900.e3, y0=300.e3, rf=5, rc=4
+    set Function expression =  if((y>=300.e3) & (x>=x0) & (x<=xf),rf,rc )
+  end
+ 
+end
+
+##################### Postprocessing ########################
+
+subsection Postprocess
+
+  set List of postprocessors = visualization, basic statistics, temperature statistics, topography, composition statistics, velocity statistics, heat flux statistics, melt statistics, depth average
+
+  # We mainly want to look at material properties of the solid and the melt. 
+  subsection Visualization
+    set List of output variables      = heating, material properties, melt material properties, melt fraction, strain rate, nonadiabatic pressure, vertical heat flux, volumetric strain rate #, maximum horizontal compressive stress
+
+    subsection Material properties
+      set List of material properties = density, viscosity
+    end
+
+
+    # To see in which cells melt transport is modelled, it can be useful to look 
+    # at the property 'is melt cell', so we include it in the output. In addition, 
+    # we always visualize the compaction pressure 'p_c' if this postprocessor is
+    # used.  
+    subsection Melt material properties
+      set List of properties = melt production rate, dFdP, dFdT, DPDt, DTDt
+    end
+
+    set Time between graphical output = 1.
+    set Interpolate output = false
+  end
+
+  subsection Topography
+    set Output to file = true
+    set Time between text output = 1.
+  end
+
+  subsection Depth average
+    set List of output variables = composition, velocity magnitude, net melt production rate, positive melt production rate #, vertical heat flux, vertical mass flux, melt fraction #, melt production rate
+    set Time between graphical output = 1.
+    set Input dimension = 1 
+    set Output format = txt
+    set Get average = false
+    set Number of zones = 512 # grid size
+  end
+end
+
+
+# Termination criteria
+subsection Termination criteria
+ set Termination criteria = end time
+end
+
+# We write a checkpoint every 20 time steps, so that we are able to restart 
+# the computation from that point.
+subsection Checkpointing
+  set Steps between checkpoint = 20
+end
+
+

@@ -1,0 +1,275 @@
+# Primary model for Iceland (e.g. Figure 2), 2-D, spin-up phase.
+# Modified from the mid-ocean-ridge.prm cookbook.
+
+set Dimension                              = 2
+set Adiabatic surface temperature          = 1573
+
+set Nonlinear solver scheme                = single Advection, single Stokes
+set Output directory                       = iceland_SS
+
+set Start time                             = 0
+set End time                               = 3.e7
+set Use years in output instead of seconds = true
+set Timing output frequency                = 1
+set Pressure normalization                 = no
+#set Resume computation                     = true
+
+subsection Solver parameters
+  subsection Stokes solver parameters
+    set Maximum number of expensive Stokes solver steps = 5000
+    set GMRES solver restart length = 50 # instead of 50
+  end
+end
+
+# Element types
+subsection Discretization
+  set Composition polynomial degree     = 2
+  set Stokes velocity polynomial degree = 2
+  set Temperature polynomial degree     = 2
+end
+
+# Formulation classification
+subsection Formulation
+  set Enable elasticity = true
+  set Enable additional Stokes RHS = true
+end
+##################### Melting and freezing ########################
+
+set Use operator splitting                     = false
+
+subsection Solver parameters   
+  subsection Stokes solver parameters
+    set GMRES solver restart length = 200
+  end
+end
+
+
+subsection Material model
+   set Model name = melt simpler viscoelastic
+
+
+  subsection Melt simpler viscoelastic
+    set Use fixed elastic time step = false
+    set Use stress averaging = false
+    set Fixed elastic time step = 5000
+    set Reference permeability            = 1e-7
+    set Elastic shear moduli        = 1.e10
+    set Reference shear modulus =1.e10
+    set Thermal conductivity              = 4.7
+    set Reference solid density           = 3300
+    set Thermal expansion coefficient     = 2.5e-5
+    set Thermal expansivities             = 2.5e-5
+    set Reference shear viscosity         = 1.e20
+    set Reference melt density            = 3000
+    set Depletion density change          = 0
+    set Thermal viscosity exponent        = 3.0
+    set Reference bulk viscosity           = 2.e20
+    set Thermal bulk viscosity exponent   = 0
+    set Depletion solidus change          = 0
+    set Maximum viscosity scaling = 1.e4
+    set Minimum viscosity scaling = 1.e-6
+    set Reference tensile strength = 5.e60
+    set Maximum tensile strength scaling = 1.e7
+    set Minimum tensile strength scaling = 1.e-2
+    set Thermal tensile strength exponent = 400
+    set Weaken ridge =false
+    set Weaken length = 50.e3
+    set Weaken gradient = 50.e3
+    set Cohesion = 5.e7
+    set Angle of internal friction = 20.0
+    set Activation energy = 500.e3
+    set Activation volume = 20.e-6
+    set Viscosity scale = 1e-12
+    set Reference strain rate = 2.e-15
+  end
+end
+
+##################### Model geometry ########################
+
+subsection Geometry model
+  set Model name = box
+
+  subsection Box
+    set X extent      = 1200.e3
+    set Y extent      = 600.e3
+
+    # To keep the aspect ratio of our elements close to one, we chose the 
+    # coarse mesh is such a way that it has more elements in X than in Y
+    # direction, in the same ratio as the aspect ratio of the model. 
+    set X repetitions = 8
+    set Y repetitions = 4
+  end
+end
+
+# The gravity is constant and points downward. 
+subsection Gravity model
+  set Model name = vertical
+  subsection Vertical
+    set Magnitude = 9.8
+  end
+end
+
+##################### Velocity ########################
+
+
+# To model the divergent velocity field of a mid-ocean ridge, we prescribe
+# the plate velocity (pointing away from the ridge) at the top boundary. 
+# We use a closed boundary with free slip conditions as the left boundary, which 
+# marks the ridge axis and also acts as a center line for our model, so that 
+# material can not cross this boundary. 
+subsection Boundary velocity model
+  set Prescribed velocity boundary indicators = top:function, right y:zero velocity
+  set Tangential velocity boundary indicators = left
+  subsection Function
+    # We choose a half-spreading rate of u0=1cm/yr.
+    set Function constants  = u0=0.01, vel_gradient = 5.e3, Lz = 300e3, x0 =10.e3, xc = 300e3
+    set Variable names      = x,y,t
+    set Function expression = u0* tanh(x/vel_gradient);0
+  end
+
+end
+
+# We prescribe the lithostatic pressure as a boundary traction on 
+# the bottom and right side of the model, so that material can flow in and out 
+# according to the flow induced by the moving plate.  
+
+subsection Boundary traction model
+  
+  set Prescribed traction boundary indicators = right x:initial lithostatic pressure, bottom:initial lithostatic pressure
+  subsection Initial lithostatic pressure
+    # We calculate the pressure profile at the right model boundary. 
+    set Representative point         = 100.e3, 290.e3
+    #set Additional pressure          = -1.e6
+  end
+  
+end
+
+
+##################### Temperature ########################
+# As initial temperature, we choose an adiabatic profile with boundary layers at the 
+# top and the bottom. Plume thermal anomaly at base of domain.
+
+subsection Initial temperature model
+  set Model name = adiabatic
+  subsection Adiabatic
+    set Spreading rate         = 0.01
+    set Spreading center location = 0.e3
+    set Age top boundary layer = 1.e6
+    set Age bottom boundary layer   = 0.0
+    set Amplitude                   = 0
+    set Plume width                 = 100.e3
+    set Plume temperature           = 175.0
+    set Plume height                = 10.e3
+    set Plume location              = 0.0
+    subsection Function
+      set Function expression       = 0;0;0;0;0;0
+    end
+  end
+
+end
+
+# We choose a constant temperature at the top and bottom of the domain. 
+
+subsection Boundary temperature model
+  set Fixed temperature boundary indicators = top, bottom, right
+  set List of model names = initial temperature
+  subsection Initial temperature
+    set Minimal temperature = 273
+    set Maximal temperature = 1573
+  end
+
+end
+
+
+subsection Heating model
+  set List of model names = adiabatic heating, latent heat melt
+end
+
+##################### Composition ########################
+
+subsection Compositional fields
+  set Number of fields = 6
+  set Names of fields = stress_xx,stress_yy,stress_xy,porosity, peridotite, p_c_field
+end
+
+# Everything initially zero.
+subsection Initial composition model
+  set List of model names = function
+  subsection Function
+    # two linear functions.
+     set Function constants = phimax=0.0, radius=5e3, x0 = 300.e3, y0 = 290.e3, radius2=8e3
+     set Function expression = 0;0;0;if( (x-x0)^2+(y-y0)^2<radius2^2,phimax*exp(-((x-x0)^2+(y-y0)^2)/(radius^2)), 0);0;0
+     set Variable names      = x,y
+  end
+end
+
+# The boundary conditions (which are relevant for material inflowing at the 
+# bottom boundary of the model) are the same as the initial conditions.
+subsection Boundary composition model
+  set Fixed composition boundary indicators   = bottom,right
+  set List of model names = initial composition
+end
+
+##################### Mesh refinement #########################
+
+# We use a uniform grid.
+subsection Mesh refinement
+  set Coarsening fraction                      = 0.05
+  set Refinement fraction                      = 0.2
+
+  set Initial adaptive refinement              = 0
+  set Initial global refinement                = 4
+  set Time steps between mesh refinement       = 0
+  
+end
+
+##################### Postprocessing ########################
+
+subsection Postprocess
+
+  set List of postprocessors = visualization, basic statistics, temperature statistics, topography, composition statistics, velocity statistics, heat flux statistics, melt statistics #, depth average
+
+  subsection Visualization
+    set List of output variables      = heating, material properties, melt material properties, melt fraction, strain rate, nonadiabatic pressure, vertical heat flux, volumetric strain rate #, maximum horizontal compressive stress
+
+    subsection Material properties
+      set List of material properties = density, viscosity
+    end
+
+
+    subsection Melt material properties
+      set List of properties = melt production rate, dFdP, dFdT, DPDt, DTDt
+    end
+
+    set Time between graphical output = 1.e5
+    set Interpolate output = false
+  end
+
+  subsection Topography
+    set Output to file = true
+    set Time between text output = 1.e7
+  end
+
+  subsection Depth average
+    set List of output variables = composition, velocity magnitude, net melt production rate, positive melt production rate #, vertical heat flux, vertical mass flux, melt fraction #, melt production rate
+    set Time between graphical output = 1.e7
+    set Input dimension = 1 
+    set Output format = txt
+    set Get average = false
+    set Number of zones = 64 # grid size
+  end
+end
+
+
+# Termination criteria
+subsection Termination criteria
+ set Termination criteria = end time
+end
+
+# We write a checkpoint every 100 time steps, so that we are able to restart 
+# the computation from that point.
+subsection Checkpointing
+  set Steps between checkpoint = 10
+end
+
+
