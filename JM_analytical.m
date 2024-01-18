@@ -18,7 +18,7 @@ tt0=t00+[(-5*dtt)-110e3 (-2*dtt)-(100e3*s2yr) -dtt-(100e3*s2yr) -100e3*s2yr 0 2e
 hscale = 1e3;
 
 hi =    [0 0 0    H0 H0 0 0]/hscale;
-dhdti = [0 0 dhdt 0 -dhdt 0 0]/hscale;
+dhdti = [0 0 dhdt 0 -dhdt/2 0 0]/hscale;
 nu = 0.25;
 
 rhos = 3300;g = 9.8;
