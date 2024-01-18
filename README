@@ -1,6 +1,6 @@
 Code to generate results of paper:
 
-Deglaciation-enhanced mantle CO2 fluxes at Yellowstone imply positive climate feedback
+Deglaciation-enhanced mantle CO2 fluxes at Yellowstone imply positive climate feedback (2024, Nature Comm.)
 by Fiona Clerc, Mark D. Behn, Brent M. Minchew
 
 --------------------------------------------------------------------------------------
@@ -22,4 +22,4 @@ Integrated through time, it can replicate Figure 5 of this study.
 
 The function calc_TE_CO2_streamline.m calculates trace elements and CO2 concentrations along a streamline, assuming retained batch melting. It can be used to replicate CO2 fluxes (e.g. Figure 3), when integrated over an entire model domain.
 
-Please contact me with any questions: fclerc@mit.edu
+Please contact me with any questions: fclerc@ldeo.columbia.edu
